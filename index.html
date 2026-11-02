@@ -180,6 +180,11 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
 .x-marq canvas{display:block;width:88px;height:88px;margin-right:10px;border:1px solid var(--rule);flex:none}
 @keyframes x-marq{to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.x-marq-track{animation:none;transform:none}}
+#mint .code{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:16px 14px;color:var(--ink)}
+#mint .check-row{flex-wrap:wrap;align-items:center}
+#mint #mxQty{flex:0 0 72px;text-align:center}
+#mint .mx-spin{display:inline-block;animation:mxspin 1s linear infinite}
+@keyframes mxspin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -953,13 +958,16 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
       mxRender();
       return;
     }
-    st.textContent = 'Reading the chain…';
+    st.innerHTML = '<span class="mx-spin">\u21bb</span> Loading supply…';
+    $('mxMinted').textContent = '…';
+    $('mxLeft').textContent = '…';
+    $('mxPhase').textContent = '…';
     const tm = await mxCall('0xa2309ff8');
     const en = await mxCall('0xd1239730');
     if (tm !== null) { try { mxMinted = Number(BigInt(tm)); } catch (e) {} }
     if (en !== null) { try { mxEnabled = BigInt(en) !== 0n; } catch (e) {} }
     if (tm === null && en === null) {
-      st.textContent = 'Chain read unavailable — the prompt below still builds with the last known numbers.';
+      st.textContent = 'Chain read unavailable — retrying in 30s.';
     } else if (mxEnabled === false) {
       st.textContent = 'Mint is closed — the owner has not opened it yet.';
     } else if (mxMinted !== null && mxMinted >= MX_SUPPLY) {
