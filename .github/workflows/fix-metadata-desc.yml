@@ -1,0 +1,42 @@
+name: Fix metadata description (RAIL)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace stale description tail
+        run: |
+          python3 - << 'PYEOF'
+          import json, glob
+          OLD = "No token, no roadmap, no promises."
+          NEW = "Each mint also grants 1,000 RAIL automatically. No roadmap, no other promises."
+          files = sorted(glob.glob('metadata/[0-9]*.json'))
+          print('files found:', len(files))
+          assert len(files) == 4444, len(files)
+          texts = []
+          for path in files:
+              s = open(path, encoding='utf-8').read()
+              assert OLD in s, path
+              texts.append(s)
+          for path, s in zip(files, texts):
+              open(path, 'w', encoding='utf-8').write(s.replace(OLD, NEW))
+          print('changed:', len(files))
+          for path in files:
+              d = json.load(open(path, encoding='utf-8'))
+              assert NEW in d['description'] and OLD not in d['description'], path
+              assert d['image'] == 'https://railix.xyz/og.jpg'
+          print('all 4444 JSON valid, description updated')
+          PYEOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add metadata
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Fix metadata description: mint grants 1,000 RAIL"
+          git push
