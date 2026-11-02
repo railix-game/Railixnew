@@ -1,0 +1,90 @@
+name: Clean dead code from index
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply cleanup patch
+        run: |
+          cat > /tmp/mint-v8.b64 << 'B64EOF'
+          LS0tIGEvaW5kZXguaHRtbAorKysgYi9pbmRleC5odG1sCkBAIC05MCwyMiArOTAsMjEgQEAKIC5w
+          YWwgLnN3e2Rpc3BsYXk6ZmxleH0ucGFsIC5zdyBpe3dpZHRoOjlweDtoZWlnaHQ6MjBweDtkaXNw
+          bGF5OmJsb2NrfQogCiAubGVkZ2Vye21hcmdpbjozNHB4IDA7Ym9yZGVyLXRvcDoxcHggc29saWQg
+          dmFyKC0tY3kpfQotLmwtcm93e2Rpc3BsYXk6ZmxleDtqdXN0aWZ5LWNvbnRlbnQ6c3BhY2UtYmV0
+          d2VlbjthbGlnbi1pdGVtczpiYXNlbGluZTtwYWRkaW5nOjE0cHggMDtib3JkZXItYm90dG9tOjFw
+          eCBzb2xpZCB2YXIoLS1ydWxlKX0KLS5sLXJvdyAua3tjb2xvcjp2YXIoLS1tdXRlKX0ubC1yb3cg
+          LnZ7Zm9udC1zaXplOjIycHg7Zm9udC13ZWlnaHQ6MzAwfS5sLXJvdyAudiBie2ZvbnQtd2VpZ2h0
+          OjUwMH0KLS5sLXJvdyAudi5tb25ve2ZvbnQtc2l6ZToxMnB4O2NvbG9yOnZhcigtLWluayl9Ci0u
+          bWV0ZXJ7cG9zaXRpb246cmVsYXRpdmU7aGVpZ2h0OjEwcHg7bWFyZ2luOjZweCAwIDRweDtiYWNr
+          Z3JvdW5kOnJlcGVhdGluZy1saW5lYXItZ3JhZGllbnQoOTBkZWcscmdiYSgxMjAsMTQwLDI1NSwu
+          MikgMCAxcHgsdHJhbnNwYXJlbnQgMXB4IDEwcHgpfQotLm1ldGVyIGRpdntoZWlnaHQ6MTAwJTt3
+          aWR0aDowO2JhY2tncm91bmQ6dmFyKC0tY3kpO3RyYW5zaXRpb246d2lkdGggLjhzfQotLm1ldGVy
+          IC50aWNre3Bvc2l0aW9uOmFic29sdXRlO3RvcDotNHB4O2JvdHRvbTotNHB4O3dpZHRoOjFweDti
+          YWNrZ3JvdW5kOnZhcigtLW1nKX0KKworCisKKworCisKIAogLnN0ZXBze2xpc3Qtc3R5bGU6bm9u
+          ZTttYXJnaW46MTBweCAwIDMwcHh9CiAuc3RlcHMgbGl7ZGlzcGxheTpncmlkO2dyaWQtdGVtcGxh
+          dGUtY29sdW1uczo0NHB4IDFmcjtnYXA6NnB4O3BhZGRpbmc6MThweCAwO2JvcmRlci1ib3R0b206
+          MXB4IHNvbGlkIHZhcigtLXJ1bGUpO2NvbG9yOiNDOUQzRUV9CiAuc3RlcHMgbGk+c3Bhbntjb2xv
+          cjp2YXIoLS1tZyk7cGFkZGluZy10b3A6NHB4fQogLnN0ZXBzIGJ7Zm9udC13ZWlnaHQ6NTAwO2Nv
+          bG9yOnZhcigtLWluayl9CiAuY29kZXtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWN5KTtiYWNrZ3Jv
+          dW5kOnZhcigtLXBhbmVsKTttYXJnaW4tYm90dG9tOjEycHh9Ci0uY29kZS10b3B7ZGlzcGxheTpm
+          bGV4O2p1c3RpZnktY29udGVudDpzcGFjZS1iZXR3ZWVuO2FsaWduLWl0ZW1zOmNlbnRlcjtwYWRk
+          aW5nOjhweCA4cHggOHB4IDE0cHg7Ym9yZGVyLWJvdHRvbToxcHggc29saWQgdmFyKC0tcnVsZSk7
+          Y29sb3I6dmFyKC0tbXV0ZSl9CisKIC5jb2RlIHByZXtmb250LWZhbWlseTp2YXIoLS1tb25vKTtm
+          b250LXNpemU6MTIuNXB4O2xpbmUtaGVpZ2h0OjEuNztwYWRkaW5nOjE2cHggMTRweDtvdmVyZmxv
+          dy14OmF1dG87d2hpdGUtc3BhY2U6cHJlO2NvbG9yOnZhcigtLWluayl9CiAuY29kZS5kYXJre2Jh
+          Y2tncm91bmQ6IzA0MDUwQTtib3JkZXItY29sb3I6dmFyKC0tbWcpfQotLmNhZGRye2NvbG9yOnZh
+          cigtLWN5KX0uY29kZS5kYXJrIC5jYWRkcntjb2xvcjp2YXIoLS1tZyl9CiAuY2hlY2t7bWFyZ2lu
+          LXRvcDoyOHB4fQogLmNoZWNrIGxhYmVse2Rpc3BsYXk6YmxvY2s7Y29sb3I6dmFyKC0tbXV0ZSk7
+          bWFyZ2luLWJvdHRvbTo4cHh9CiAuY2hlY2stcm93e2Rpc3BsYXk6ZmxleDtnYXA6OHB4fQpAQCAt
+          ODg0LDcgKzg4Myw3IEBACiAKICAgbGV0IHJ6OyB3aW5kb3cuYWRkRXZlbnRMaXN0ZW5lcigncmVz
+          aXplJywgKCkgPT4geyBjbGVhclRpbWVvdXQocnopOyByeiA9IHNldFRpbWVvdXQoKCkgPT4geyBz
+          aXplRmllbGQoKTsgZnJhbWUocGVyZm9ybWFuY2Uubm93KCkpOyBzaXplUnVuKCk7IGRyYXdSdW4o
+          KTsgZHJhd0Zvcm1zKCk7IGRyYXdDYXJkcygpOyBnZW4oZ1NlZWQudmFsdWUpOyB9LCAyMDApOyB9
+          KTsKIAotICAvLyAtLS0tLS0tLS0tIGFnZW50IG1pbnQgKHN1cGVyZGluby1zdHlsZTogY29weS1w
+          cm9tcHQsIG5vIG9uLXBhZ2Ugd2FsbGV0KSAtLS0tLS0tLS0tCisgIC8vIC0tLS0tLS0tLS0gbWlu
+          dCAoYWdlbnQgcHJvbXB0ICsgb24tcGFnZSB3YWxsZXQpIC0tLS0tLS0tLS0KICAgY29uc3QgUlhO
+          ID0gJzB4OTIxODczM0ZDMWFmMmE2Y0E1N0NBNmY4ODhiODAwMjhlOTFENDY0MCc7CiAgIGNvbnN0
+          IFJYTl9SUENTID0gWydodHRwczovL2JzYy1kYXRhc2VlZC5iaW5hbmNlLm9yZycsICdodHRwczov
+          L2JzYy5wdWJsaWNub2RlLmNvbScsICdodHRwczovL2JpbmFuY2UubGxhbWFycGMuY29tJ107CiAg
+          IGNvbnN0IE1YX0ZFRSA9IDEwMDAwMDAwMDAwMDAwMG47CkBAIC05NDMsNyArOTQyLDcgQEAKICAg
+          fQogICBmdW5jdGlvbiBteEJ1aWxkUHJvbXB0KCkgewogICAgIGNvbnN0IHdlaSA9IG14VmFsdWVX
+          ZWkoKTsKLSAgICBjb25zdCBhZGRyID0gKFJYTiA9PT0gJzB4MDAwMDAwMDAwMDAwMDAwMDAwMDAw
+          MDAwMDAwMDAwMDAwMDAwMDAwMCcpID8gJ1tORVcgQ09OVFJBQ1QgQUREUkVTUyDigJQgZmlsbGVk
+          IGluIGFmdGVyIGRlcGxveV0nIDogUlhOOworICAgIGNvbnN0IGFkZHIgPSBSWE47CiAgICAgY29u
+          c3QgbGluZXMgPSBbXTsKICAgICBsaW5lcy5wdXNoKCdNaW50IFJhaWxpeCBvbiBCTkIgQ2hhaW4g
+          KGNoYWluIGlkIDU2KS4nKTsKICAgICBsaW5lcy5wdXNoKCdDb250cmFjdDogJyArIGFkZHIpOwpA
+          QCAtMTAwMCwxMSArOTk5LDYgQEAKICAgfQogICBhc3luYyBmdW5jdGlvbiBteFJlZnJlc2goKSB7
+          CiAgICAgY29uc3Qgc3QgPSAkKCdteFN0YXR1cycpOwotICAgIGlmIChSWE4gPT09ICcweDAwMDAw
+          MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAnKSB7Ci0gICAgICBzdC50ZXh0Q29u
+          dGVudCA9ICdOZXcgY29udHJhY3Qgbm90IGRlcGxveWVkIHlldCDigJQgdGhlIHByb21wdCBiZWxv
+          dyB1c2VzIGEgcGxhY2Vob2xkZXIgYWRkcmVzcyBhbmQgd2lsbCBiZSBmaWxsZWQgaW4gYWZ0ZXIg
+          ZGVwbG95Lic7Ci0gICAgICBteFJlbmRlcigpOwotICAgICAgcmV0dXJuOwotICAgIH0KICAgICBz
+          dC5pbm5lckhUTUwgPSAnPHNwYW4gY2xhc3M9Im14LXNwaW4iPlx1MjFiYjwvc3Bhbj4gTG9hZGlu
+          ZyBzdXBwbHnigKYnOwogICAgICQoJ214TWludGVkJykudGV4dENvbnRlbnQgPSAn4oCmJzsKICAg
+          ICAkKCdteExlZnQnKS50ZXh0Q29udGVudCA9ICfigKYnOwo=
+          B64EOF
+          base64 -d /tmp/mint-v8.b64 > /tmp/mint-v8.patch
+          git apply /tmp/mint-v8.patch && echo 'PATCH APPLIED'
+          python3 - << 'PYEOF'
+          import re
+          s = open('index.html', encoding='utf-8').read()
+          assert "mxConnect" in s and "mxMintBtn" in s and "mxAgentWallet" in s
+          assert "caddr" not in s and "New contract not deployed" not in s
+          sc = re.search(r'<script>(.*?)</script>', s, re.DOTALL).group(1)
+          open('/tmp/check.js', 'w').write(sc)
+          print('cleanup present')
+          PYEOF
+          node --check /tmp/check.js && echo 'JS SYNTAX OK'
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Remove dead CSS and placeholder contract branch from index"
+          git push
