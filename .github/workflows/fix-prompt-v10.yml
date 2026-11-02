@@ -1,0 +1,41 @@
+name: Fix stale free prompt after phase 2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply prompt fix patch
+        run: |
+          cat > /tmp/mint-v10.b64 << 'B64EOF'
+          LS0tIGEvaW5kZXguaHRtbAorKysgYi9pbmRleC5odG1sCkBAIC05NTksNiArOTU5LDcgQEAKICAg
+          ICByZXR1cm4gbGluZXMuam9pbignXG4nKTsKICAgfQogICBmdW5jdGlvbiBteFJlbmRlcigpIHsK
+          KyAgICBpZiAobXhPcCA9PT0gJ2ZyZWUnICYmIG14TWludGVkICE9PSBudWxsICYmIG14TWludGVk
+          ID49IE1YX0ZSRUVfTElNSVQpIG14T3AgPSAnZmVlJzsKICAgICBsZXQgY2FwID0gbXhNYXgoKTsK
+          ICAgICBpZiAobXhNaW50ZWQgIT09IG51bGwpIHsKICAgICAgIGNvbnN0IHBoYXNlTGVmdCA9IG14
+          T3AgPT09ICdmcmVlJyA/IChNWF9GUkVFX0xJTUlUIC0gbXhNaW50ZWQpIDogKE1YX1NVUFBMWSAt
+          IG14TWludGVkKTsK
+          B64EOF
+          base64 -d /tmp/mint-v10.b64 > /tmp/mint-v10.patch
+          git apply /tmp/mint-v10.patch && echo 'PATCH APPLIED'
+          python3 - << 'PYEOF'
+          import re
+          s = open('index.html', encoding='utf-8').read()
+          assert "if (mxOp === 'free' && mxMinted !== null && mxMinted >= MX_FREE_LIMIT) mxOp = 'fee';" in s
+          sc = re.search(r'<script>(.*?)</script>', s, re.DOTALL).group(1)
+          open('/tmp/check.js', 'w').write(sc)
+          print('prompt fix present')
+          PYEOF
+          node --check /tmp/check.js && echo 'JS SYNTAX OK'
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Auto-switch mint prompt from free to fee when free phase ends"
+          git push
