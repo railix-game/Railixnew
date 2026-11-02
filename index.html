@@ -90,22 +90,21 @@ code{font-family:var(--mono);font-size:.82em;background:var(--panel-2);color:var
 .pal .sw{display:flex}.pal .sw i{width:9px;height:20px;display:block}
 
 .ledger{margin:34px 0;border-top:1px solid var(--cy)}
-.l-row{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--rule)}
-.l-row .k{color:var(--mute)}.l-row .v{font-size:22px;font-weight:300}.l-row .v b{font-weight:500}
-.l-row .v.mono{font-size:12px;color:var(--ink)}
-.meter{position:relative;height:10px;margin:6px 0 4px;background:repeating-linear-gradient(90deg,rgba(120,140,255,.2) 0 1px,transparent 1px 10px)}
-.meter div{height:100%;width:0;background:var(--cy);transition:width .8s}
-.meter .tick{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--mg)}
+
+
+
+
+
+
 
 .steps{list-style:none;margin:10px 0 30px}
 .steps li{display:grid;grid-template-columns:44px 1fr;gap:6px;padding:18px 0;border-bottom:1px solid var(--rule);color:#C9D3EE}
 .steps li>span{color:var(--mg);padding-top:4px}
 .steps b{font-weight:500;color:var(--ink)}
 .code{border:1px solid var(--cy);background:var(--panel);margin-bottom:12px}
-.code-top{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 8px 14px;border-bottom:1px solid var(--rule);color:var(--mute)}
+
 .code pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:16px 14px;overflow-x:auto;white-space:pre;color:var(--ink)}
 .code.dark{background:#04050A;border-color:var(--mg)}
-.caddr{color:var(--cy)}.code.dark .caddr{color:var(--mg)}
 .check{margin-top:28px}
 .check label{display:block;color:var(--mute);margin-bottom:8px}
 .check-row{display:flex;gap:8px}
@@ -884,7 +883,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
 
   let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { sizeField(); frame(performance.now()); sizeRun(); drawRun(); drawForms(); drawCards(); gen(gSeed.value); }, 200); });
 
-  // ---------- agent mint (superdino-style: copy-prompt, no on-page wallet) ----------
+  // ---------- mint (agent prompt + on-page wallet) ----------
   const RXN = '0x9218733FC1af2a6cA57CA6f888b80028e91D4640';
   const RXN_RPCS = ['https://bsc-dataseed.binance.org', 'https://bsc.publicnode.com', 'https://binance.llamarpc.com'];
   const MX_FEE = 100000000000000n;
@@ -943,7 +942,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
   }
   function mxBuildPrompt() {
     const wei = mxValueWei();
-    const addr = (RXN === '0x0000000000000000000000000000000000000000') ? '[NEW CONTRACT ADDRESS — filled in after deploy]' : RXN;
+    const addr = RXN;
     const lines = [];
     lines.push('Mint Railix on BNB Chain (chain id 56).');
     lines.push('Contract: ' + addr);
@@ -1000,11 +999,6 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
   }
   async function mxRefresh() {
     const st = $('mxStatus');
-    if (RXN === '0x0000000000000000000000000000000000000000') {
-      st.textContent = 'New contract not deployed yet — the prompt below uses a placeholder address and will be filled in after deploy.';
-      mxRender();
-      return;
-    }
     st.innerHTML = '<span class="mx-spin">\u21bb</span> Loading supply…';
     $('mxMinted').textContent = '…';
     $('mxLeft').textContent = '…';
