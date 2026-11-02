@@ -242,12 +242,16 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
 
   <section class="sec mint" id="mint">
     <div class="art-no mono">Line 03 · Boarding</div>
-    <h2 class="display">Mint with your agent.</h2>
-    <p class="body">This page does not mint by itself. Like Super Dino, it builds the exact prompt for your AI agent: pick an operation, set the amount, copy the prompt, paste it to your agent. Your agent signs on BNB Chain (56). No wallet is connected on this page, and no inviter address is used — the new contract takes no inviter argument, and there is no eligibility list: anyone can mint within the phase and the per-mint max.</p>
+    <h2 class="display">Mint your line.</h2>
+    <p class="body">Mint two ways: connect your wallet and mint directly here, or build the exact prompt for your AI agent. Pick an operation, set the amount, then mint from your wallet or copy the prompt and paste it to your agent. Your wallet or agent signs on BNB Chain (56). No inviter address is used — the contract takes no inviter argument, and there is no eligibility list: anyone can mint within the phase and the per-mint max.</p>
     <p class="body">Mint = get token: every NFT minted also grants <b>1,000 RAIL</b> automatically, in the same transaction. No claim, no extra fee.</p>
     <p class="mono small" id="mxStatus">Reading the chain…</p>
     <p class="mono small">Lines laid <span id="mxMinted">—</span> / 4,444 · Lines left <span id="mxLeft">—</span> · Phase <span id="mxPhase">—</span></p>
     <div class="check">
+      <div class="check-row">
+        <button class="btn ink sm" id="mxConnect">Connect Wallet</button>
+        <span class="mono small" id="mxWallet">Not connected</span>
+      </div>
       <div class="check-row" id="mxOps">
         <button class="btn ink sm" data-op="free">Free · 0 BNB</button>
         <button class="btn line sm" data-op="fee">Free + 0.0001 BNB</button>
@@ -260,6 +264,13 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
         <span class="mono small" id="mxMaxNote"></span>
       </div>
       <p class="mono small" id="mxValue">Total value: 0 BNB (0 wei) + network gas, paid by your agent wallet.</p>
+      <button class="btn ink" id="mxMintBtn">Mint now</button>
+      <p class="mono small" id="mxMintOut" aria-live="polite"></p>
+      <label class="mono small" for="mxAgentWallet">Agent wallet address — paste it here (optional, fills the prompt)</label>
+      <div class="check-row">
+        <input id="mxAgentWallet" placeholder="0x… (your agent wallet address)">
+      </div>
+      <p class="mono small" id="mxWalletOut" aria-live="polite"></p>
       <pre class="code" id="mxPrompt">Pick an operation to build the prompt…</pre>
       <button class="btn ink" id="mxCopy">Copy prompt</button>
       <p class="mono small" id="mxCopyOut" aria-live="polite"></p>
@@ -880,6 +891,32 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
   const MX_PAID = 300000000000000n;
   const MX_FREE_LIMIT = 444;
   const MX_SUPPLY = 4444;
+  const RXN_TOKEN = '0x3Ae866Be52aA471418c4ae2f6cF72E92C12F580b';
+  let mxWallet = null;
+  function mxIsAddress(a) { return /^0x[0-9a-fA-F]{40}$/.test((a || '').trim()); }
+  function mxFnSel() { return mxOp === 'free' ? 'a4146733' : (mxOp === 'fee' ? '7a297b8b' : '26c7f77c'); }
+  function mxEncodeMint() {
+    const qty = BigInt(mxQty).toString(16);
+    return '0x' + mxFnSel() + qty.padStart(64, '0');
+  }
+  function mxAgentWallet() {
+    const el = $('mxAgentWallet');
+    const v = el ? el.value.trim() : '';
+    return mxIsAddress(v) ? v : null;
+  }
+  function mxParseMintedIds(receipt) {
+    const ids = [];
+    const T0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const logs = (receipt && receipt.logs) || [];
+    for (const log of logs) {
+      if (!log.topics || log.topics.length < 4) continue;
+      if (log.address.toLowerCase() !== RXN.toLowerCase()) continue;
+      if (log.topics[0].toLowerCase() !== T0) continue;
+      if (BigInt(log.topics[1]) !== 0n) continue;
+      try { ids.push(Number(BigInt(log.topics[3]))); } catch (e) {}
+    }
+    return ids;
+  }
   let mxOp = 'free', mxQty = 1, mxMinted = null, mxEnabled = null;
   function mxBnb(wei) {
     const whole = wei / 1000000000000000000n;
@@ -910,6 +947,8 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
     const lines = [];
     lines.push('Mint Railix on BNB Chain (chain id 56).');
     lines.push('Contract: ' + addr);
+    const aw = mxAgentWallet();
+    if (aw) lines.push('Agent wallet: ' + aw + ' — mint from this wallet.');
     lines.push('Call ' + mxFn() + '(' + mxQty + ').');
     lines.push('Value: ' + wei.toString() + ' wei (' + mxBnb(wei) + ' BNB) — exact, plus network gas.');
     lines.push('Check first: mintEnabled must be true; totalMinted must be ' + (mxOp === 'free' ? 'below 444' : '444 or more') + '; totalMinted + ' + mxQty + ' must be at most 4444.');
@@ -926,9 +965,16 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
     if (mxQty > cap && cap > 0) mxQty = cap;
     if (mxQty < 1) mxQty = 1;
     $('mxQty').value = String(mxQty);
+    $('mxWallet').textContent = mxWallet ? ('Connected: ' + mxWallet.slice(0, 6) + '…' + mxWallet.slice(-4)) : 'Not connected';
+    $('mxConnect').textContent = mxWallet ? 'Wallet connected' : 'Connect Wallet';
+    const wEl = $('mxAgentWallet');
+    if (wEl) {
+      const v = wEl.value.trim();
+      $('mxWalletOut').textContent = v === '' ? '' : (mxIsAddress(v) ? 'Wallet added to the prompt.' : 'Invalid address — the prompt will omit the wallet line.');
+    }
     $('mxMaxNote').textContent = 'Max ' + mxMax() + ' per mint' + (cap < mxMax() ? ' · only ' + cap + ' left in this phase' : '');
     const wei = mxValueWei();
-    $('mxValue').textContent = 'Total value: ' + mxBnb(wei) + ' BNB (' + wei.toString() + ' wei) + network gas, paid by your agent wallet.';
+    $('mxValue').textContent = 'Total value: ' + mxBnb(wei) + ' BNB (' + wei.toString() + ' wei) + network gas, paid by the minting wallet.';
     $('mxPrompt').textContent = mxBuildPrompt();
     const soldOut = mxMinted !== null && mxMinted >= MX_SUPPLY;
     const freeDone = mxMinted !== null && mxMinted >= MX_FREE_LIMIT;
@@ -941,6 +987,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
     $('mxMinus').disabled = mxQty <= 1;
     $('mxPlus').disabled = cap <= 0 || mxQty >= cap;
     $('mxCopy').disabled = soldOut || cap <= 0 || mxEnabled === false;
+    $('mxMintBtn').disabled = !mxWallet || soldOut || cap <= 0 || mxEnabled === false;
     if (mxMinted === null) {
       $('mxMinted').textContent = '—';
       $('mxLeft').textContent = '—';
@@ -1005,6 +1052,95 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
       done(ok);
     }
   });
+  async function mxConnect() {
+    const out = $('mxMintOut');
+    if (!window.ethereum) { out.textContent = 'No wallet found — open this page in MetaMask, OKX Wallet, or another EVM wallet browser.'; return; }
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (!accounts || !accounts.length) { out.textContent = 'No account selected.'; return; }
+      mxWallet = accounts[0];
+      try {
+        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
+      } catch (swErr) {
+        if (swErr && swErr.code === 4902) {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x38', chainName: 'BNB Smart Chain', nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 }, rpcUrls: ['https://bsc-dataseed.binance.org'], blockExplorerUrls: ['https://bscscan.com'] }] });
+        } else { throw swErr; }
+      }
+      const inp = $('mxAgentWallet');
+      if (inp) inp.value = mxWallet;
+      out.textContent = 'Connected: ' + mxWallet;
+      mxRender();
+    } catch (e) {
+      out.textContent = (e && e.code === 4001) ? 'Connection cancelled in wallet.' : 'Connection failed: ' + (e && (e.message || e));
+    }
+  }
+  if (window.ethereum && window.ethereum.on) {
+    window.ethereum.on('accountsChanged', function (acc) {
+      mxWallet = (acc && acc[0]) || null;
+      if (!mxWallet) { const inp = $('mxAgentWallet'); if (inp) inp.value = ''; }
+      mxRender();
+    });
+  }
+  async function mxWaitReceipt(hash) {
+    for (let i = 0; i < 40; i++) {
+      try {
+        const r = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [hash] });
+        if (r) return r;
+      } catch (e) {}
+      await new Promise(function (res) { setTimeout(res, 3000); });
+    }
+    return null;
+  }
+  async function mxCallTokenBalance(wallet) {
+    const data = '0x70a08231' + wallet.slice(2).toLowerCase().padStart(64, '0');
+    for (const rpc of RXN_RPCS) {
+      try {
+        const r = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: RXN_TOKEN, data: data }, 'latest'] }) });
+        const j = await r.json();
+        if (j && j.result) return j.result;
+      } catch (e) {}
+    }
+    return null;
+  }
+  async function mxMintDirect() {
+    const out = $('mxMintOut');
+    if (!mxWallet) { out.textContent = 'Connect your wallet first.'; return; }
+    if (mxEnabled === false) { out.textContent = 'Mint is closed — the owner has not opened it yet.'; return; }
+    const wei = mxValueWei();
+    out.textContent = 'Waiting for your wallet signature…';
+    let hash;
+    try {
+      hash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: mxWallet, to: RXN, value: '0x' + wei.toString(16), data: mxEncodeMint() }] });
+    } catch (e) {
+      out.textContent = (e && e.code === 4001) ? 'Cancelled in wallet.' : 'Send failed: ' + (e && (e.message || e));
+      return;
+    }
+    out.textContent = 'Sent — waiting for confirmation… Tx: ' + hash;
+    const receipt = await mxWaitReceipt(hash);
+    if (!receipt) { out.textContent = 'Still confirming — check this tx on BscScan: ' + hash; return; }
+    if (receipt.status === '0x0') { out.textContent = 'Transaction failed on-chain. Tx: ' + hash; return; }
+    const ids = mxParseMintedIds(receipt);
+    out.textContent = '';
+    const span = document.createElement('span');
+    span.textContent = 'Minted!' + (ids.length ? ' Token #' + ids.join(', #') : '') + ' Tx: ' + hash;
+    out.appendChild(span);
+    try {
+      const bal = await mxCallTokenBalance(mxWallet);
+      if (bal !== null) {
+        const b = document.createElement('span');
+        b.textContent = ' · Your RAIL balance: ' + mxBnb(BigInt(bal)) + ' RAIL.';
+        out.appendChild(b);
+      }
+    } catch (e) {}
+    const a = document.createElement('a');
+    a.href = 'https://bscscan.com/tx/' + hash;
+    a.textContent = ' View on BscScan';
+    out.appendChild(a);
+    mxRefresh();
+  }
+  $('mxConnect').addEventListener('click', mxConnect);
+  $('mxMintBtn').addEventListener('click', mxMintDirect);
+  $('mxAgentWallet').addEventListener('input', mxRender);
   mxRender();
   mxRefresh();
   setInterval(mxRefresh, 30000);
