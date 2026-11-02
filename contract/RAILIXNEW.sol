@@ -11,6 +11,10 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 /// After phase 1, TWO mint options draw from the same remaining pool until sold out:
 ///   - mintFreeFee: free NFT + 0.0001 BNB fee per NFT, max 10 per tx.
 ///   - mintPaid: 0.0003 BNB per NFT, max 10 per tx.
+/// Every NFT minted also grants the minter 1,000 RAIL (Railix Token) automatically,
+/// minted by the RAIL token contract in the same transaction, so minting and
+/// reward cannot be separated. The token address is fixed at deploy and the
+/// token contract only accepts this contract as its minter.
 /// Minting is sequential by token id; a pseudo-random seed is fixed on-chain
 /// for each token at mint time (seedOf), so the drawing code can redraw any
 /// Railix from its number. Minting works from any wallet (no contract-caller
@@ -20,6 +24,10 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 /// All mint payments are sent to this contract and stay here until the owner
 /// withdraws them. There is no treasury address.
 /// tokenURI = baseURI + tokenId + ".json", matching the metadata files (1.json .. 4444.json).
+interface IToken {
+    function mint(address to, uint256 amount) external;
+}
+
 contract RAILIXNEW is ERC721, Ownable {
     using Strings for uint256;
 
@@ -30,17 +38,21 @@ contract RAILIXNEW is ERC721, Ownable {
     uint256 public constant MAX_PER_TX_FREE = 3;
     uint256 public constant MAX_PER_TX_FEE = 10;
     uint256 public constant MAX_PER_TX_PAID = 10;
+    uint256 public constant TOKENS_PER_MINT = 1000 ether;
 
     uint256 public totalMinted;
     bool public mintEnabled;
+    address public rewardToken;
     string private _baseTokenURI;
     mapping(uint256 => uint256) private _seeds;
 
     event MintEnabledChanged(bool enabled);
     event BaseURIChanged(string baseURI);
 
-    constructor(string memory baseURI_) ERC721("Railix", "RAILIX") Ownable(msg.sender) {
+    constructor(string memory baseURI_, address rewardToken_) ERC721("Railix", "RAILIX") Ownable(msg.sender) {
+        require(rewardToken_ != address(0), "Token address required");
         _baseTokenURI = baseURI_;
+        rewardToken = rewardToken_;
     }
 
     function _mintNext(address to) internal {
@@ -57,6 +69,7 @@ contract RAILIXNEW is ERC721, Ownable {
             )
         );
         _safeMint(to, tokenId);
+        IToken(rewardToken).mint(to, TOKENS_PER_MINT);
     }
 
     function mintFree(uint256 amount) external payable {
