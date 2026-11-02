@@ -1,0 +1,75 @@
+name: Clean Railixnew for new contract
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove old mint/deploy wiring from index.html
+        run: |
+          python3 - << 'PY'
+          import re
+          s = open('index.html', encoding='utf-8').read()
+          a = s.find('<section class="sec mint" id="mint">')
+          b = s.find('<section class="sec" id="runners">')
+          assert a != -1 and b != -1 and a < b
+          s = s[:a] + s[b:]
+          nav = '<a href="#mint">Board</a>'
+          assert s.count(nav) == 1
+          s = s.replace(nav, "")
+          cta = '<a class="btn ink" href="#mint">Mint a line</a>'
+          assert s.count(cta) == 1
+          s = s.replace(cta, "")
+          s2, n = re.subn(r"<details><summary>Who can mint\?</summary>.*?</details>", "", s, flags=re.DOTALL)
+          assert n == 1
+          s = s2
+          s2, n = re.subn(r'<a id="cLink"[^>]*>.*?</a>', "", s, flags=re.DOTALL)
+          assert n == 1
+          s = s2
+          m1 = re.search(r"// ---------- chain ----------", s)
+          m2 = re.search(r"// ---------- reveal ----------", s)
+          assert m1 and m2 and m1.start() < m2.start()
+          cs = s.rfind("\n", 0, m1.start()) + 1
+          rs = s.rfind("\n", 0, m2.start()) + 1
+          cut = s[cs:rs]
+          assert "const RX" in cut and "pmMint" in cut
+          s = s[:cs] + s[rs:]
+          FORBIDDEN = [
+              "0x4f1012edd878cbbd2686eb0d98e91302a0fe2474",
+              "0x8a20be5d6cbda88408ba272bb43d4902b08518f0",
+              "0x1249c58b", "0x9d1b464a", "0x70a08231",
+              "currentPrice", "pmConnect", "pmMint", "pmWallet", "pmOut",
+              "pmFare", "pmAccount", "pmProvider", "pmRefreshWal",
+              "mMinted", "mFill", "mLeft", "mStatus",
+              "window.ethereum", "eth_call", "eth_requestAccounts",
+              "eth_sendTransaction", "bscscan", "BscScan",
+              "const RX", "rpcCall",
+          ]
+          for f in FORBIDDEN:
+              assert f not in s, f"leftover: {f}"
+          assert "#mint" not in s
+          assert s.count("<section") == s.count("</section>")
+          for keep in ["genCanvas", "marq", "run3", "formGrid", "seedLine",
+                       "// ---------- reveal ----------", "})();",
+                       'id="runners"', 'id="market"', 'id="notes"']:
+              assert keep in s, f"lost: {keep}"
+          open('index.html', 'w', encoding='utf-8').write(s)
+          print("index.html cleaned")
+          PY
+      - name: Delete deploy, contract and mint files
+        run: |
+          rm -f deploy.html deploy-v3.html deploy-baru.html railix-deploy.html railix-open-mint.html railix-close-mint.html railix-close-mint-v2.html railix-close-mint-any.html mint.html
+          rm -rf contract
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Clean Railixnew for new contract: drop deploy, contract and old mint wiring"
+          git push
