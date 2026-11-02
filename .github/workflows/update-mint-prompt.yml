@@ -1,0 +1,34 @@
+name: Add RAIL reward line to mint prompt
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add reward line
+        run: |
+          python3 - << 'PYEOF'
+          import re
+          s = open('index.html', encoding='utf-8').read()
+          old = "lines.push('Wait for the receipt, then report the transaction hash.');"
+          assert s.count(old) == 1, s.count(old)
+          new = "lines.push('Each NFT minted also grants you 1,000 RAIL automatically in the same transaction.');\n    " + old
+          s = s.replace(old, new, 1)
+          open('index.html', 'w', encoding='utf-8').write(s)
+          sc = re.search(r'<script>(.*?)</script>', s, re.DOTALL).group(1)
+          open('/tmp/check.js', 'w').write(sc)
+          print('reward line added')
+          PYEOF
+          node --check /tmp/check.js && echo 'JS SYNTAX OK'
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Mention 1000 RAIL reward in agent mint prompt"
+          git push
