@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Railix Token — Deploy</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
+<style>
+body{margin:0;background:#101010;color:#ece7db;font-family:Inter,system-ui,sans-serif;padding:24px;line-height:1.7}
+main{max-width:760px;margin:0 auto}
+h1{font-family:Georgia,serif;font-style:italic;font-weight:400;font-size:42px}
+h1 em{color:#ff2d2d}
+.card{border:1px solid #2a2a2a;background:#161616;border-radius:12px;padding:18px;margin:16px 0}
+button{background:#c8f542;color:#000;border:0;border-radius:8px;padding:12px 20px;font-weight:700;cursor:pointer;margin:6px 6px 6px 0}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.secondary{background:#ffc93c}
+a{color:#ffc93c}
+code{background:#000;border:1px solid #2a2a2a;border-radius:6px;padding:2px 6px;word-break:break-all}
+input,select{width:100%;box-sizing:border-box;background:#000;color:#ece7db;border:1px solid #2a2a2a;border-radius:8px;padding:11px;margin:8px 0}
+.warn{border:1px dashed #a66;background:#1a0f0f;border-radius:10px;padding:14px}
+.mut{color:#9a9ab0}
+.ok{color:#7ddf8a}
+.result{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>Deploy <em>Railix Token.</em></h1>
+<p class="mut">No Remix, no contract copy-paste. On this page only: connect the owner wallet, pick a network, press Deploy, then <b>just sign in your wallet</b>.</p>
+<p class="warn"><b>Mainnet version:</b> deploy to BNB Mainnet (56) with real BNB. This token starts with totalSupply 0 and can only be minted by the Railix NFT contract, 1,000 RAIL per NFT, up to 4,444,000 RAIL. Deploying alone mints nothing.</p>
+
+<div class="card">
+<h2>1. Connect the owner wallet</h2>
+<p>The wallet that deploys automatically becomes the contract owner. Use MetaMask or OKX Wallet.</p>
+<button id="connectBtn" onclick="connectWallet()">Connect Wallet Owner</button>
+<p id="walletinfo" class="mut">Wallet not connected yet.</p>
+<p class="warn"><b>Never</b> share your seed phrase or private key with anyone, including this page. This page never asks for those keys — it only asks for a transaction signature in your own wallet.</p>
+</div>
+
+<div class="card">
+<h2>2. Pick a network, then Deploy</h2>
+<label for="network">Network</label>
+<select id="network">
+<option value="mainnet" selected>BNB Mainnet (56) — final deploy, using real BNB</option>
+<option value="testnet">BNB Testnet (97) — for practice, using tBNB</option>
+</select>
+<p class="mut">Mainnet is already the main choice. Testnet is still there if you want to practice first. Deploy only pays gas, not the mint price — and this deploy <b>does not open mint</b>.</p>
+<button id="deployBtn" onclick="deployContract()">Deploy Mainnet Railix Token — Just Sign</button>
+<p id="deployStatus" class="mut"></p>
+<div id="deployResult" class="result">
+<p class="ok"><b>Contract deployed successfully!</b></p>
+<p>Contract address: <code id="contractAddress"></code> <button onclick="copyAddress()">Copy Address</button></p>
+<p>Deploy transaction: <code id="deployTx"></code></p>
+<p><a id="scanLink" href="#" target="_blank" rel="noopener">View on BscScan</a></p>
+<p>Mint status from the contract (read directly on-chain): <code id="mintStatus">—</code></p>
+<p>Contract owner: <code id="ownerAddress">—</code></p>
+<p class="mut">Save this address. Deploy order: (1) this token, (2) the NFT contract with this token address, (3) set this token's minter to the NFT address in step 3 below, (4) only then open NFT mint. Until step 3 is done, NFT mints will revert — that is the safety check working.</p>
+</div>
+</div>
+
+<div class="card">
+<h2>3. After deploy: set the minter, also just sign</h2>
+<p>Correct order: (1) this token is deployed, (2) deploy the NFT contract with this token address, (3) owner signs <code>setMinter</code> below with the NFT address (one-time only), (4) only then open NFT mint. The minter can never be changed afterwards.</p>
+<label for="deployedAddress">Already-deployed contract address</label>
+<input id="deployedAddress" placeholder="0x... (auto-filled after deploy)">
+<label for="nftAddress">NFT contract address (after you deploy it)</label>
+<input id="nftAddress" placeholder="0x... (fill after NFT deploy)">
+<button class="secondary" onclick="setMinter()">Set Minter (NFT address) — Sign in Wallet</button>
+<button class="secondary" onclick="checkDeployedContract()">Check Contract — Read Only, No Sign</button>
+<p id="checkResult" class="mut"></p>
+<p id="ownerStatus" class="mut"></p>
+<p class="mut">Token locked in the contract: Railix Token (RAIL), 18 decimals, max supply 4,444,000 RAIL, minted only by the NFT contract at 1,000 RAIL per NFT. No pre-mint, no owner mint, no tax.</p>
+<p class="mut">Still want the old way? <a href="https://remix.ethereum.org/" target="_blank" rel="noopener">Open Remix</a> and deploy the <code>RAILTOKEN.sol</code> file from this repo.</p>
+</div>
+</main>
+<script>
+const ABI = [{"inputs": [], "stateMutability": "nonpayable", "type": "constructor"}, {"inputs": [{"internalType": "address", "name": "spender", "type": "address"}, {"internalType": "uint256", "name": "allowance", "type": "uint256"}, {"internalType": "uint256", "name": "needed", "type": "uint256"}], "name": "ERC20InsufficientAllowance", "type": "error"}, {"inputs": [{"internalType": "address", "name": "sender", "type": "address"}, {"internalType": "uint256", "name": "balance", "type": "uint256"}, {"internalType": "uint256", "name": "needed", "type": "uint256"}], "name": "ERC20InsufficientBalance", "type": "error"}, {"inputs": [{"internalType": "address", "name": "approver", "type": "address"}], "name": "ERC20InvalidApprover", "type": "error"}, {"inputs": [{"internalType": "address", "name": "receiver", "type": "address"}], "name": "ERC20InvalidReceiver", "type": "error"}, {"inputs": [{"internalType": "address", "name": "sender", "type": "address"}], "name": "ERC20InvalidSender", "type": "error"}, {"inputs": [{"internalType": "address", "name": "spender", "type": "address"}], "name": "ERC20InvalidSpender", "type": "error"}, {"inputs": [{"internalType": "address", "name": "owner", "type": "address"}], "name": "OwnableInvalidOwner", "type": "error"}, {"inputs": [{"internalType": "address", "name": "account", "type": "address"}], "name": "OwnableUnauthorizedAccount", "type": "error"}, {"anonymous": false, "inputs": [{"indexed": true, "internalType": "address", "name": "owner", "type": "address"}, {"indexed": true, "internalType": "address", "name": "spender", "type": "address"}, {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}], "name": "Approval", "type": "event"}, {"anonymous": false, "inputs": [{"indexed": false, "internalType": "address", "name": "minter", "type": "address"}], "name": "MinterSet", "type": "event"}, {"anonymous": false, "inputs": [{"indexed": true, "internalType": "address", "name": "previousOwner", "type": "address"}, {"indexed": true, "internalType": "address", "name": "newOwner", "type": "address"}], "name": "OwnershipTransferred", "type": "event"}, {"anonymous": false, "inputs": [{"indexed": true, "internalType": "address", "name": "from", "type": "address"}, {"indexed": true, "internalType": "address", "name": "to", "type": "address"}, {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}], "name": "Transfer", "type": "event"}, {"inputs": [], "name": "MAX_SUPPLY", "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}], "stateMutability": "view", "type": "function"}, {"inputs": [{"internalType": "address", "name": "owner", "type": "address"}, {"internalType": "address", "name": "spender", "type": "address"}], "name": "allowance", "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}], "stateMutability": "view", "type": "function"}, {"inputs": [{"internalType": "address", "name": "spender", "type": "address"}, {"internalType": "uint256", "name": "value", "type": "uint256"}], "name": "approve", "outputs": [{"internalType": "bool", "name": "", "type": "bool"}], "stateMutability": "nonpayable", "type": "function"}, {"inputs": [{"internalType": "address", "name": "account", "type": "address"}], "name": "balanceOf", "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}], "stateMutability": "view", "type": "function"}, {"inputs": [], "name": "decimals", "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}], "stateMutability": "view", "type": "function"}, {"inputs": [{"internalType": "address", "name": "to", "type": "address"}, {"internalType": "uint256", "name": "amount", "type": "uint256"}], "name": "mint", "outputs": [], "stateMutability": "nonpayable", "type": "function"}, {"inputs": [], "name": "minter", "outputs": [{"internalType": "address", "name": "", "type": "address"}], "stateMutability": "view", "type": "function"}, {"inputs": [], "name": "name", "outputs": [{"internalType": "string", "name": "", "type": "string"}], "stateMutability": "view", "type": "function"}, {"inputs": [], "name": "owner", "outputs": [{"internalType": "address", "name": "", "type": "address"}], "stateMutability": "view", "type": "function"}, {"inputs": [], "name": "renounceOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function"}, {"inputs": [{"internalType": "address", "name": "m", "type": "address"}], "name": "setMinter", "outputs": [], "stateMutability": "nonpayable", "type": "function"}, {"inputs": [], "name": "symbol", "outputs": [{"internalType": "string", "name": "", "type": "string"}], "stateMutability": "view", "type": "function"}, {"inputs": [], "name": "totalSupply", "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}], "stateMutability": "view", "type": "function"}, {"inputs": [{"internalType": "address", "name": "to", "type": "address"}, {"internalType": "uint256", "name": "value", "type": "uint256"}], "name": "transfer", "outputs": [{"internalType": "bool", "name": "", "type": "bool"}], "stateMutability": "nonpayable", "type": "function"}, {"inputs": [{"internalType": "address", "name": "from", "type": "address"}, {"internalType": "address", "name": "to", "type": "address"}, {"internalType": "uint256", "name": "value", "type": "uint256"}], "name": "transferFrom", "outputs": [{"internalType": "bool", "name": "", "type": "bool"}], "stateMutability": "nonpayable", "type": "function"}, {"inputs": [{"internalType": "address", "name": "newOwner", "type": "address"}], "name": "transferOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function"}];
+const BYTECODE = "0x608060405234801562000010575f80fd5b50336040518060400160405280600c81526020016b2930b4b634bc102a37b5b2b760a11b815250604051806040016040528060048152602001631490525360e21b8152508160039081620000659190620001a6565b506004620000748282620001a6565b5050506001600160a01b038116620000a557604051631e4fbdf760e01b81525f600482015260240160405180910390fd5b620000b081620000b7565b5062000272565b600580546001600160a01b038381166001600160a01b0319831681179093556040519116919082907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0905f90a35050565b634e487b7160e01b5f52604160045260245ffd5b600181811c908216806200013157607f821691505b6020821081036200015057634e487b7160e01b5f52602260045260245ffd5b50919050565b601f821115620001a157805f5260205f20601f840160051c810160208510156200017d5750805b601f840160051c820191505b818110156200019e575f815560010162000189565b50505b505050565b81516001600160401b03811115620001c257620001c262000108565b620001da81620001d384546200011c565b8462000156565b602080601f83116001811462000210575f8415620001f85750858301515b5f19600386901b1c1916600185901b1785556200026a565b5f85815260208120601f198616915b8281101562000240578886015182559484019460019091019084016200021f565b50858210156200025e57878501515f19600388901b60f8161c191681555b505060018460011b0185555b505050505050565b610a9880620002805f395ff3fe608060405234801561000f575f80fd5b50600436106100fb575f3560e01c806370a0823111610093578063a9059cbb11610063578063a9059cbb1461020f578063dd62ed3e14610222578063f2fde38b1461025a578063fca3b5aa1461026d575f80fd5b806370a08231146101c6578063715018a6146101ee5780638da5cb5b146101f657806395d89b4114610207575f80fd5b806323b872dd116100ce57806323b872dd1461017d578063313ce5671461019057806332cb6b0c1461019f57806340c10f19146101b1575f80fd5b806306fdde03146100ff578063075461721461011d578063095ea7b31461014857806318160ddd1461016b575b5f80fd5b610107610280565b60405161011491906108f2565b60405180910390f35b600654610130906001600160a01b031681565b6040516001600160a01b039091168152602001610114565b61015b610156366004610959565b610310565b6040519015158152602001610114565b6002545b604051908152602001610114565b61015b61018b366004610981565b610329565b60405160128152602001610114565b61016f6a03ad0db90496e4a180000081565b6101c46101bf366004610959565b61034c565b005b61016f6101d43660046109ba565b6001600160a01b03165f9081526020819052604090205490565b6101c4610403565b6005546001600160a01b0316610130565b610107610416565b61015b61021d366004610959565b610425565b61016f6102303660046109da565b6001600160a01b039182165f90815260016020908152604080832093909416825291909152205490565b6101c46102683660046109ba565b610432565b6101c461027b3660046109ba565b61046f565b60606003805461028f90610a0b565b80601f01602080910402602001604051908101604052809291908181526020018280546102bb90610a0b565b80156103065780601f106102dd57610100808354040283529160200191610306565b820191905f5260205f20905b8154815290600101906020018083116102e957829003601f168201915b5050505050905090565b5f3361031d81858561055e565b60019150505b92915050565b5f33610336858285610570565b6103418585856105eb565b506001949350505050565b6006546001600160a01b031633146103985760405162461bcd60e51b815260206004820152600a6024820152692737ba1036b4b73a32b960b11b60448201526064015b60405180910390fd5b6a03ad0db90496e4a1800000816103ae60025490565b6103b89190610a43565b11156103f55760405162461bcd60e51b815260206004820152600c60248201526b10d85c08195e18d95959195960a21b604482015260640161038f565b6103ff8282610648565b5050565b61040b61067c565b6104145f6106a9565b565b60606004805461028f90610a0b565b5f3361031d8185856105eb565b61043a61067c565b6001600160a01b03811661046357604051631e4fbdf760e01b81525f600482015260240161038f565b61046c816106a9565b50565b61047761067c565b6006546001600160a01b0316156104c55760405162461bcd60e51b8152602060048201526012602482015271135a5b9d195c88185b1c9958591e481cd95d60721b604482015260640161038f565b6001600160a01b03811661050a5760405162461bcd60e51b815260206004820152600c60248201526b5a65726f206164647265737360a01b604482015260640161038f565b600680546001600160a01b0319166001600160a01b0383169081179091556040519081527f726b590ef91a8c76ad05bbe91a57ef84605276528f49cd47d787f558a4e755b69060200160405180910390a150565b61056b83838360016106fa565b505050565b6001600160a01b038381165f908152600160209081526040808320938616835292905220545f1981146105e557818110156105d757604051637dc7a0d960e11b81526001600160a01b0384166004820152602481018290526044810183905260640161038f565b6105e584848484035f6106fa565b50505050565b6001600160a01b03831661061457604051634b637e8f60e11b81525f600482015260240161038f565b6001600160a01b03821661063d5760405163ec442f0560e01b81525f600482015260240161038f565b61056b8383836107cc565b6001600160a01b0382166106715760405163ec442f0560e01b81525f600482015260240161038f565b6103ff5f83836107cc565b6005546001600160a01b031633146104145760405163118cdaa760e01b815233600482015260240161038f565b600580546001600160a01b038381166001600160a01b0319831681179093556040519116919082907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0905f90a35050565b6001600160a01b0384166107235760405163e602df0560e01b81525f600482015260240161038f565b6001600160a01b03831661074c57604051634a1406b160e11b81525f600482015260240161038f565b6001600160a01b038085165f90815260016020908152604080832093871683529290522082905580156105e557826001600160a01b0316846001600160a01b03167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925846040516107be91815260200190565b60405180910390a350505050565b6001600160a01b0383166107f6578060025f8282546107eb9190610a43565b909155506108669050565b6001600160a01b0383165f90815260208190526040902054818110156108485760405163391434e360e21b81526001600160a01b0385166004820152602481018290526044810183905260640161038f565b6001600160a01b0384165f9081526020819052604090209082900390555b6001600160a01b038216610882576002805482900390556108a0565b6001600160a01b0382165f9081526020819052604090208054820190555b816001600160a01b0316836001600160a01b03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040516108e591815260200190565b60405180910390a3505050565b5f602080835283518060208501525f5b8181101561091e57858101830151858201604001528201610902565b505f604082860101526040601f19601f8301168501019250505092915050565b80356001600160a01b0381168114610954575f80fd5b919050565b5f806040838503121561096a575f80fd5b6109738361093e565b946020939093013593505050565b5f805f60608486031215610993575f80fd5b61099c8461093e565b92506109aa6020850161093e565b9150604084013590509250925092565b5f602082840312156109ca575f80fd5b6109d38261093e565b9392505050565b5f80604083850312156109eb575f80fd5b6109f48361093e565b9150610a026020840161093e565b90509250929050565b600181811c90821680610a1f57607f821691505b602082108103610a3d57634e487b7160e01b5f52602260045260245ffd5b50919050565b8082018082111561032357634e487b7160e01b5f52601160045260245ffdfea264697066735822122068778a3c8a9078d89d732f69294d9db55640fc1b2c4b994b329f61466124df3564736f6c63430008180033";
+const NETWORKS = {
+  testnet: { chainId: 97, hex: "0x61", name: "BNB Testnet", rpc: "https://data-seed-prebsc-1-s1.binance.org:8545/", scan: "https://testnet.bscscan.com", currency: "tBNB" },
+  mainnet: { chainId: 56, hex: "0x38", name: "BNB Mainnet", rpc: "https://bsc-dataseed.binance.org/", scan: "https://bscscan.com", currency: "BNB" }
+};
+let provider = null, signer = null, account = null;
+
+function eth() {
+  return window.ethereum || (window.okxwallet && window.okxwallet.ethereum) || null;
+}
+async function connectWallet() {
+  const info = document.getElementById("walletinfo");
+  const e = eth();
+  if (!e) { info.textContent = "Wallet not found. Install MetaMask or OKX Wallet first, then refresh this page."; return; }
+  try {
+    provider = new ethers.BrowserProvider(e);
+    const accounts = await e.request({ method: "eth_requestAccounts" });
+    signer = await provider.getSigner();
+    account = accounts[0];
+    const net = await provider.getNetwork();
+    info.textContent = "Connected: " + account + " | Chain ID: " + net.chainId + ". Make sure this is the owner wallet before deploying.";
+  } catch (err) {
+    info.textContent = "Wallet connection cancelled or failed. Try again.";
+  }
+}
+async function ensureNetwork(key) {
+  const net = NETWORKS[key];
+  const e = eth();
+  try {
+    await e.request({ method: "wallet_switchEthereumChain", params: [{ chainId: net.hex }] });
+  } catch (err) {
+    if (err && err.code === 4902) {
+      await e.request({ method: "wallet_addEthereumChain", params: [{ chainId: net.hex, chainName: net.name, nativeCurrency: { name: net.currency, symbol: net.currency, decimals: 18 }, rpcUrls: [net.rpc], blockExplorerUrls: [net.scan] }] });
+    } else { throw err; }
+  }
+  provider = new ethers.BrowserProvider(e);
+  signer = await provider.getSigner();
+}
+async function deployContract() {
+  const status = document.getElementById("deployStatus");
+  if (typeof ethers === "undefined") { status.textContent = "Wallet library failed to load. Check your internet connection and refresh."; return; }
+  if (!signer) { status.textContent = "Connect the owner wallet first (step 1)."; return; }
+  const key = document.getElementById("network").value;
+  const net = NETWORKS[key];
+  const btn = document.getElementById("deployBtn");
+  btn.disabled = true;
+  try {
+    status.textContent = "Preparing network " + net.name + "...";
+    await ensureNetwork(key);
+    status.textContent = "Please sign the deploy transaction in your wallet...";
+    const factory = new ethers.ContractFactory(ABI, BYTECODE, signer);
+    const contract = await factory.deploy();
+    status.textContent = "Deploy transaction sent: " + contract.deploymentTransaction().hash + ". Waiting for network confirmation...";
+    await contract.waitForDeployment();
+    const address = await contract.getAddress();
+    document.getElementById("contractAddress").textContent = address;
+    document.getElementById("deployTx").textContent = contract.deploymentTransaction().hash;
+    document.getElementById("deployedAddress").value = address;
+    const link = document.getElementById("scanLink");
+    link.href = net.scan + "/address/" + address;
+    document.getElementById("deployResult").style.display = "block";
+    try {
+      const check = new ethers.Contract(address, ABI, provider);
+      const ownerAddr = await check.owner();
+      const supply = await check.totalSupply();
+      document.getElementById("mintStatus").textContent = "Token deployed — totalSupply " + supply.toString() + " (0 until NFT mints begin), minter not set yet";
+      document.getElementById("ownerAddress").textContent = ownerAddr;
+    } catch (e) {
+      document.getElementById("mintStatus").textContent = "Token deployed — set the minter in step 3 after the NFT deploys.";
+    }
+    status.innerHTML = "<span class='ok'>Done on " + net.name + ". Mint is NOT opened directly — only the owner can open it with a signature in step 3.</span>";
+  } catch (err) {
+    status.textContent = "Deploy cancelled or failed: " + (err && (err.shortMessage || err.message) ? (err.shortMessage || err.message) : "try again.");
+  } finally { btn.disabled = false; }
+}
+function copyAddress() {
+  const t = document.getElementById("contractAddress").textContent;
+  if (t) navigator.clipboard.writeText(t);
+}
+async function getOwnerContract() {
+  if (!signer) { document.getElementById("ownerStatus").textContent = "Connect the owner wallet first (step 1)."; return null; }
+  const address = document.getElementById("deployedAddress").value.trim();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) { document.getElementById("ownerStatus").textContent = "Fill in a valid contract address first."; return null; }
+  return new ethers.Contract(address, ABI, signer);
+}
+async function setMinter() {
+  const status = document.getElementById("ownerStatus");
+  const nft = document.getElementById("nftAddress").value.trim();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(nft)) { status.textContent = "Fill in a valid NFT contract address first."; return; }
+  const c = await getOwnerContract(); if (!c) return;
+  try { status.textContent = "Please sign setMinter in your wallet..."; const tx = await c.setMinter(nft); await tx.wait(); status.innerHTML = "<span class='ok'>Minter set to the NFT contract. Tx: " + tx.hash + "</span>"; }
+  catch (err) { status.textContent = "Cancelled or failed: " + (err && (err.shortMessage || err.message) || "try again."); }
+}
+
+async function checkDeployedContract() {
+  const out = document.getElementById("checkResult");
+  const address = document.getElementById("deployedAddress").value.trim();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) { out.textContent = "Fill in a valid contract address first in step 3."; return; }
+  if (!provider) { out.textContent = "Connect your wallet first (step 1). This check is read-only and asks for no signature."; return; }
+  out.textContent = "Reading the contract on-chain...";
+  try {
+    const net = await provider.getNetwork();
+    const code = await provider.getCode(address);
+    let html = "Current wallet chain: " + net.chainId + (net.chainId.toString() === "56" ? " (BNB Mainnet, correct)" : " (NOT 56 — switch to BNB Mainnet first)") + "<br>";
+    html += "Contract code on this chain: " + (code === "0x" ? "NONE (0x) — this address is not a contract on this chain" : (code.length - 2) / 2 + " bytes") + "<br>";
+    if (code === "0x") { out.innerHTML = html + "<b>Stop here:</b> on the current wallet chain there is no contract at that address. That is a common cause of the 'could not decode result data' error. Switch your wallet to BNB Mainnet 56, reconnect, then press Check Contract again."; return; }
+    const c = new ethers.Contract(address, ABI, provider);
+    const tests = [["name", () => c.name()], ["symbol", () => c.symbol()], ["decimals", () => c.decimals()], ["owner", () => c.owner()], ["MAX_SUPPLY", () => c.MAX_SUPPLY()], ["totalSupply", () => c.totalSupply()], ["minter", () => c.minter()]];
+    const vals = {};
+    for (const [label, fn] of tests) {
+      try { const v = await fn(); vals[label] = (typeof v === "bigint") ? v.toString() : String(v); html += label + ": OK = " + vals[label] + "<br>"; }
+      catch (e) { vals[label] = null; html += label + ": GAGAL (" + (e && (e.shortMessage || e.message) || "error") + ")<br>"; }
+    }
+    const match = vals.name === "Railix Token" && vals.symbol === "RAIL" && vals.decimals === "18" && vals.MAX_SUPPLY === "4444000000000000000000000";
+    html += match ? "<span class='ok'><b>Matches the locked Railix Token contract.</b> Next: deploy the NFT contract with this token address, then set this contract's minter to the NFT address in step 3.</span>" : "<b>WARNING: not yet matching / a function failed.</b> If a function above shows FAILED, the contract at that address is probably not Railix Token with this ABI, or the wallet is still on the wrong chain.";
+    out.innerHTML = html;
+  } catch (err) {
+    out.textContent = "Failed to read the contract: " + (err && (err.shortMessage || err.message) || "try again.") + " Make sure your wallet is on BNB Mainnet 56 and the address is correct.";
+  }
+}
+</script>
+</body>
+</html>
