@@ -906,6 +906,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
     lines.push('Call ' + mxFn() + '(' + mxQty + ').');
     lines.push('Value: ' + wei.toString() + ' wei (' + mxBnb(wei) + ' BNB) — exact, plus network gas.');
     lines.push('Check first: mintEnabled must be true; totalMinted must be ' + (mxOp === 'free' ? 'below 444' : '444 or more') + '; totalMinted + ' + mxQty + ' must be at most 4444.');
+    lines.push('Each NFT minted also grants you 1,000 RAIL automatically in the same transaction.');
     lines.push('Wait for the receipt, then report the transaction hash.');
     return lines.join('\n');
   }
