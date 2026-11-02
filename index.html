@@ -184,6 +184,8 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
 #mint #mxQty{flex:0 0 72px;text-align:center}
 #mint .mx-spin{display:inline-block;animation:mxspin 1s linear infinite}
 @keyframes mxspin{to{transform:rotate(360deg)}}
+#mint .mx-div{border-top:1px solid var(--rule);margin:22px 0 16px}
+#mxMintOut.mx-err{color:var(--mg)}
 </style>
 </head>
 <body>
@@ -191,7 +193,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
 <header class="bar">
   <a class="mark" href="#top"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke-width="2" stroke-linecap="round"><path d="M9 2 4 22M15 2l5 20" stroke="#22E6FF"/><path d="M6 17h12M7.5 11h9M8.7 6h6.6" stroke="#FF2BD6"/></svg>RAILIX</a>
   <nav class="nav mono"><a href="#run">Track</a><a href="#tracks">Shapes</a><a href="#mint">Board</a><a href="#runners">Depot</a><a href="#market">Exchange</a></nav>
-  <a class="mono mk-pill" href="#market">Exchange · soon</a>
+  <a class="mono mk-pill" href="#market">Exchange</a>
   <div class="count mono"><i></i><b id="barCount">0</b>/4444</div>
 </header>
 
@@ -265,6 +267,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
       <p class="mono small" id="mxValue">Total value: 0 BNB (0 wei) + network gas, paid by your agent wallet.</p>
       <button class="btn ink" id="mxMintBtn">Mint now</button>
       <p class="mono small" id="mxMintOut" aria-live="polite"></p>
+      <div class="mx-div"></div>
       <label class="mono small" for="mxAgentWallet">Agent wallet address — paste it here (optional, fills the prompt)</label>
       <div class="check-row">
         <input id="mxAgentWallet" placeholder="0x… (your agent wallet address)">
@@ -289,9 +292,9 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
   </section>
 
   <section class="sec" id="market">
-    <div class="art-no mono">Line 05 · The Exchange · Coming soon</div>
+    <div class="art-no mono">Line 05 · The Exchange</div>
     <h2 class="display">The exchange.</h2>
-    <p style="max-width:620px;color:var(--mute);margin-bottom:26px">Where Railix lines change hands, with every laid line and its owner on one board. Buying, selling and offers open soon through Element on BNB Chain.</p>
+    <p style="max-width:620px;color:var(--mute);margin-bottom:26px">Where Railix lines change hands, with every laid line and its owner on one board. Trading runs through Element on BNB Chain, and opens as soon as lines are laid and listed.</p>
     <div class="x-stats mono">
       <div><b>—</b><span>Lines laid</span></div>
       <div><b>—</b><span>Owners</span></div>
@@ -305,7 +308,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
     </div>
     <p class="x-count mono" id="mkCount" aria-live="polite"></p>
     <div class="x-cards" id="mkGrid"></div>
-    <p class="x-note">Exchange preview. Trading is not open yet. Railix is a standard ERC-721 on BNB Chain.</p>
+    <p class="x-note">No lines laid yet — the board below previews all 4,444 lines. Once mint opens and lines are laid, holders can list them on Element. Railix is a standard ERC-721 on BNB Chain.</p>
   </section>
 
   <section class="sec" id="notes">
@@ -753,7 +756,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
     const T = TRACKS[s.form], P = PALETTES[s.pal];
     el.innerHTML = '<canvas role="img" aria-label="Railix line ' + pad(s.id) + ', ' + T[0] + ' in ' + P.name + '"></canvas>' +
       '<div class="x-card-meta"><span class="mono x-id">Line ' + pad(s.id) + '</span><b>' + T[0] + '</b><span>' + P.name + '</span></div>' +
-      (market ? '<div class="x-card-act"><button disabled>Buy · soon</button><button disabled>Offer · soon</button></div>' : '');
+      (market ? '<div class="x-card-act"><button disabled>Buy · after mint</button><button disabled>Offer · after mint</button></div>' : '');
     return { s, el, cv: el.querySelector('canvas'), cw: 0, city: null };
   }
   function drawCards() {
@@ -1048,10 +1051,10 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
   });
   async function mxConnect() {
     const out = $('mxMintOut');
-    if (!window.ethereum) { out.textContent = 'No wallet found — open this page in MetaMask, OKX Wallet, or another EVM wallet browser.'; return; }
+    if (!window.ethereum) { out.textContent = 'No wallet found in this browser — mint directly inside MetaMask or OKX wallet app, or use the agent prompt below.'; out.classList.add('mx-err'); return; }
     try {
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      if (!accounts || !accounts.length) { out.textContent = 'No account selected.'; return; }
+      if (!accounts || !accounts.length) { out.textContent = 'No account selected.'; out.classList.add('mx-err'); return; }
       mxWallet = accounts[0];
       try {
         await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
@@ -1062,10 +1065,10 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
       }
       const inp = $('mxAgentWallet');
       if (inp) inp.value = mxWallet;
-      out.textContent = 'Connected: ' + mxWallet;
+      out.textContent = 'Connected: ' + mxWallet; out.classList.remove('mx-err');
       mxRender();
     } catch (e) {
-      out.textContent = (e && e.code === 4001) ? 'Connection cancelled in wallet.' : 'Connection failed: ' + (e && (e.message || e));
+      out.textContent = (e && e.code === 4001) ? 'Connection cancelled in wallet.' : 'Connection failed: ' + (e && (e.message || e)); out.classList.add('mx-err');
     }
   }
   if (window.ethereum && window.ethereum.on) {
@@ -1098,23 +1101,24 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
   }
   async function mxMintDirect() {
     const out = $('mxMintOut');
-    if (!mxWallet) { out.textContent = 'Connect your wallet first.'; return; }
-    if (mxEnabled === false) { out.textContent = 'Mint is closed — the owner has not opened it yet.'; return; }
+    if (!mxWallet) { out.textContent = 'Connect your wallet first.'; out.classList.add('mx-err'); return; }
+    if (mxEnabled === false) { out.textContent = 'Mint is closed — the owner has not opened it yet.'; out.classList.add('mx-err'); return; }
     const wei = mxValueWei();
-    out.textContent = 'Waiting for your wallet signature…';
+    out.textContent = 'Waiting for your wallet signature…'; out.classList.remove('mx-err');
     let hash;
     try {
       hash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: mxWallet, to: RXN, value: '0x' + wei.toString(16), data: mxEncodeMint() }] });
     } catch (e) {
-      out.textContent = (e && e.code === 4001) ? 'Cancelled in wallet.' : 'Send failed: ' + (e && (e.message || e));
+      out.textContent = (e && e.code === 4001) ? 'Cancelled in wallet.' : 'Send failed: ' + (e && (e.message || e)); out.classList.add('mx-err');
       return;
     }
-    out.textContent = 'Sent — waiting for confirmation… Tx: ' + hash;
+    out.textContent = 'Sent — waiting for confirmation… Tx: ' + hash; out.classList.remove('mx-err');
     const receipt = await mxWaitReceipt(hash);
-    if (!receipt) { out.textContent = 'Still confirming — check this tx on BscScan: ' + hash; return; }
-    if (receipt.status === '0x0') { out.textContent = 'Transaction failed on-chain. Tx: ' + hash; return; }
+    if (!receipt) { out.textContent = 'Still confirming — check this tx on BscScan: ' + hash; out.classList.remove('mx-err'); return; }
+    if (receipt.status === '0x0') { out.textContent = 'Transaction failed on-chain. Tx: ' + hash; out.classList.add('mx-err'); return; }
     const ids = mxParseMintedIds(receipt);
     out.textContent = '';
+    out.classList.remove('mx-err');
     const span = document.createElement('span');
     span.textContent = 'Minted!' + (ids.length ? ' Token #' + ids.join(', #') : '') + ' Tx: ' + hash;
     out.appendChild(span);
