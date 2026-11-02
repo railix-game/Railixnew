@@ -186,7 +186,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
 
 <header class="bar">
   <a class="mark" href="#top"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke-width="2" stroke-linecap="round"><path d="M9 2 4 22M15 2l5 20" stroke="#22E6FF"/><path d="M6 17h12M7.5 11h9M8.7 6h6.6" stroke="#FF2BD6"/></svg>RAILIX</a>
-  <nav class="nav mono"><a href="#run">Track</a><a href="#tracks">Shapes</a><a href="#runners">Depot</a><a href="#market">Exchange</a></nav>
+  <nav class="nav mono"><a href="#run">Track</a><a href="#tracks">Shapes</a><a href="#mint">Board</a><a href="#runners">Depot</a><a href="#market">Exchange</a></nav>
   <a class="mono mk-pill" href="#market">Exchange · soon</a>
   <div class="count mono"><i></i><b id="barCount">0</b>/4444</div>
 </header>
@@ -235,7 +235,32 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
 
   <div class="x-marq" aria-hidden="true"><div class="x-marq-track" id="marq"></div></div>
 
-  <section class="sec" id="runners">
+  <section class="sec mint" id="mint">
+    <div class="art-no mono">Line 03 · Boarding</div>
+    <h2 class="display">Mint with your agent.</h2>
+    <p class="body">This page does not mint by itself. Like Super Dino, it builds the exact prompt for your AI agent: pick an operation, set the amount, copy the prompt, paste it to your agent. Your agent signs on BNB Chain (56). No wallet is connected on this page, and no inviter address is used — the new contract takes no inviter argument, and there is no eligibility list: anyone can mint within the phase and the per-mint max.</p>
+    <p class="mono small" id="mxStatus">Reading the chain…</p>
+    <p class="mono small">Lines laid <span id="mxMinted">—</span> / 4,444 · Lines left <span id="mxLeft">—</span> · Phase <span id="mxPhase">—</span></p>
+    <div class="check">
+      <div class="check-row" id="mxOps">
+        <button class="btn ink sm" data-op="free">Free · 0 BNB</button>
+        <button class="btn line sm" data-op="fee">Free + 0.0001 BNB</button>
+        <button class="btn line sm" data-op="paid">Paid · 0.0003 BNB</button>
+      </div>
+      <div class="check-row">
+        <button class="btn line sm" id="mxMinus">−</button>
+        <input id="mxQty" value="1" readonly>
+        <button class="btn line sm" id="mxPlus">+</button>
+        <span class="mono small" id="mxMaxNote"></span>
+      </div>
+      <p class="mono small" id="mxValue">Total value: 0 BNB (0 wei) + network gas, paid by your agent wallet.</p>
+      <pre class="code" id="mxPrompt">Pick an operation to build the prompt…</pre>
+      <button class="btn ink" id="mxCopy">Copy prompt</button>
+      <p class="mono small" id="mxCopyOut" aria-live="polite"></p>
+      <p class="mono small">Max is per mint (per transaction), not per wallet. Free mint works only while fewer than 444 lines are laid. Fee and paid mints open after #444 and draw from the same remaining pool until sold out. All payments go to the contract and stay there until the owner withdraws.</p>
+    </div>
+  </section>
+    <section class="sec" id="runners">
     <div class="art-no mono">Line 04 · The Depot</div>
     <h2 class="display">Lines laid so far.</h2>
     <div class="gallery" id="gallery"><p class="empty mono">The first line is waiting for its conductor.</p></div>
@@ -840,6 +865,138 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
   lb.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') lbShow(lbi - 1); if (e.key === 'ArrowRight') lbShow(lbi + 1); });
 
   let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { sizeField(); frame(performance.now()); sizeRun(); drawRun(); drawForms(); drawCards(); gen(gSeed.value); }, 200); });
+
+  // ---------- agent mint (superdino-style: copy-prompt, no on-page wallet) ----------
+  const RXN = '0x0000000000000000000000000000000000000000';
+  const RXN_RPCS = ['https://bsc-dataseed.binance.org', 'https://bsc.publicnode.com', 'https://binance.llamarpc.com'];
+  const MX_FEE = 100000000000000n;
+  const MX_PAID = 300000000000000n;
+  const MX_FREE_LIMIT = 444;
+  const MX_SUPPLY = 4444;
+  let mxOp = 'free', mxQty = 1, mxMinted = null, mxEnabled = null;
+  function mxBnb(wei) {
+    const whole = wei / 1000000000000000000n;
+    let frac = (wei % 1000000000000000000n).toString();
+    while (frac.length < 18) frac = '0' + frac;
+    frac = frac.replace(/0+$/, '');
+    return whole.toString() + (frac ? '.' + frac : '');
+  }
+  function mxMax() { return mxOp === 'free' ? 3 : 10; }
+  function mxFn() { return mxOp === 'free' ? 'mintFree' : (mxOp === 'fee' ? 'mintFreeFee' : 'mintPaid'); }
+  function mxValueWei() {
+    if (mxOp === 'free') return 0n;
+    return (mxOp === 'fee' ? MX_FEE : MX_PAID) * BigInt(mxQty);
+  }
+  async function mxCall(data) {
+    for (const rpc of RXN_RPCS) {
+      try {
+        const r = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: RXN, data: data }, 'latest'] }) });
+        const j = await r.json();
+        if (j && j.result) return j.result;
+      } catch (e) {}
+    }
+    return null;
+  }
+  function mxBuildPrompt() {
+    const wei = mxValueWei();
+    const addr = (RXN === '0x0000000000000000000000000000000000000000') ? '[NEW CONTRACT ADDRESS — filled in after deploy]' : RXN;
+    const lines = [];
+    lines.push('Mint Railix on BNB Chain (chain id 56).');
+    lines.push('Contract: ' + addr);
+    lines.push('Call ' + mxFn() + '(' + mxQty + ').');
+    lines.push('Value: ' + wei.toString() + ' wei (' + mxBnb(wei) + ' BNB) — exact, plus network gas.');
+    lines.push('Check first: mintEnabled must be true; totalMinted must be ' + (mxOp === 'free' ? 'below 444' : '444 or more') + '; totalMinted + ' + mxQty + ' must be at most 4444.');
+    lines.push('Wait for the receipt, then report the transaction hash.');
+    return lines.join('\n');
+  }
+  function mxRender() {
+    let cap = mxMax();
+    if (mxMinted !== null) {
+      const phaseLeft = mxOp === 'free' ? (MX_FREE_LIMIT - mxMinted) : (MX_SUPPLY - mxMinted);
+      if (phaseLeft < cap) cap = phaseLeft > 0 ? phaseLeft : 0;
+    }
+    if (mxQty > cap && cap > 0) mxQty = cap;
+    if (mxQty < 1) mxQty = 1;
+    $('mxQty').value = String(mxQty);
+    $('mxMaxNote').textContent = 'Max ' + mxMax() + ' per mint' + (cap < mxMax() ? ' · only ' + cap + ' left in this phase' : '');
+    const wei = mxValueWei();
+    $('mxValue').textContent = 'Total value: ' + mxBnb(wei) + ' BNB (' + wei.toString() + ' wei) + network gas, paid by your agent wallet.';
+    $('mxPrompt').textContent = mxBuildPrompt();
+    const soldOut = mxMinted !== null && mxMinted >= MX_SUPPLY;
+    const freeDone = mxMinted !== null && mxMinted >= MX_FREE_LIMIT;
+    const feeLocked = mxMinted !== null && mxMinted < MX_FREE_LIMIT;
+    document.querySelectorAll('#mxOps button').forEach(function (b) {
+      const op = b.getAttribute('data-op');
+      b.disabled = soldOut || (op === 'free' && freeDone) || (op !== 'free' && feeLocked);
+      b.classList.toggle('on', op === mxOp);
+    });
+    $('mxMinus').disabled = mxQty <= 1;
+    $('mxPlus').disabled = cap <= 0 || mxQty >= cap;
+    $('mxCopy').disabled = soldOut || cap <= 0 || mxEnabled === false;
+    if (mxMinted === null) {
+      $('mxMinted').textContent = '—';
+      $('mxLeft').textContent = '—';
+      $('mxPhase').textContent = '—';
+    } else {
+      $('mxMinted').textContent = String(mxMinted);
+      $('mxLeft').textContent = String(MX_SUPPLY - mxMinted);
+      $('mxPhase').textContent = soldOut ? 'Sold out' : (freeDone ? 'Fee + Paid open' : 'Free');
+    }
+  }
+  async function mxRefresh() {
+    const st = $('mxStatus');
+    if (RXN === '0x0000000000000000000000000000000000000000') {
+      st.textContent = 'New contract not deployed yet — the prompt below uses a placeholder address and will be filled in after deploy.';
+      mxRender();
+      return;
+    }
+    st.textContent = 'Reading the chain…';
+    const tm = await mxCall('0xa2309ff8');
+    const en = await mxCall('0xd1239730');
+    if (tm !== null) { try { mxMinted = Number(BigInt(tm)); } catch (e) {} }
+    if (en !== null) { try { mxEnabled = BigInt(en) !== 0n; } catch (e) {} }
+    if (tm === null && en === null) {
+      st.textContent = 'Chain read unavailable — the prompt below still builds with the last known numbers.';
+    } else if (mxEnabled === false) {
+      st.textContent = 'Mint is closed — the owner has not opened it yet.';
+    } else if (mxMinted !== null && mxMinted >= MX_SUPPLY) {
+      st.textContent = 'Sold out — all 4,444 lines are laid.';
+    } else {
+      st.textContent = 'Live on-chain.';
+    }
+    mxRender();
+  }
+  document.querySelectorAll('#mxOps button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      mxOp = b.getAttribute('data-op');
+      mxQty = 1;
+      mxRender();
+    });
+  });
+  $('mxMinus').addEventListener('click', function () { if (mxQty > 1) { mxQty -= 1; mxRender(); } });
+  $('mxPlus').addEventListener('click', function () { mxQty += 1; mxRender(); });
+  $('mxCopy').addEventListener('click', function () {
+    const text = $('mxPrompt').textContent;
+    const out = $('mxCopyOut');
+    function done(ok) {
+      out.textContent = ok ? 'Copied — paste it to your agent.' : 'Copy failed — select the prompt text manually.';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }).catch(function () { done(false); });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      done(ok);
+    }
+  });
+  mxRender();
+  mxRefresh();
+  setInterval(mxRefresh, 30000);
 
   // ---------- reveal ----------
   document.querySelectorAll('.sec h2, .body, .toy, .ledger, .steps li, .code, details').forEach((el) => el.classList.add('rv'));
