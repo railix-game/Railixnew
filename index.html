@@ -959,6 +959,7 @@ details p{padding:0 0 22px;max-width:620px;color:#C9D3EE}
     return lines.join('\n');
   }
   function mxRender() {
+    if (mxOp === 'free' && mxMinted !== null && mxMinted >= MX_FREE_LIMIT) mxOp = 'fee';
     let cap = mxMax();
     if (mxMinted !== null) {
       const phaseLeft = mxOp === 'free' ? (MX_FREE_LIMIT - mxMinted) : (MX_SUPPLY - mxMinted);
