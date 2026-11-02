@@ -1,0 +1,51 @@
+name: Polish mint section layout and supply loading
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Polish mint layout and loading state
+        run: |
+          python3 - << 'PYEOF'
+          import re
+          s = open('index.html', encoding='utf-8').read()
+          old_css = '</style>'
+          assert s.count(old_css) == 1, s.count(old_css)
+          css = '''#mint .code{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:16px 14px;color:var(--ink)}
+          #mint .check-row{flex-wrap:wrap;align-items:center}
+          #mint #mxQty{flex:0 0 72px;text-align:center}
+          #mint .mx-spin{display:inline-block;animation:mxspin 1s linear infinite}
+          @keyframes mxspin{to{transform:rotate(360deg)}}
+          </style>'''
+          s = s.replace(old_css, css, 1)
+          old_js = """    st.textContent = 'Reading the chain…';
+              const tm = await mxCall('0xa2309ff8');"""
+          assert s.count(old_js) == 1, s.count(old_js)
+          new_js = """    st.innerHTML = '<span class="mx-spin">\\u21bb</span> Loading supply…';
+              $('mxMinted').textContent = '…';
+              $('mxLeft').textContent = '…';
+              $('mxPhase').textContent = '…';
+              const tm = await mxCall('0xa2309ff8');"""
+          s = s.replace(old_js, new_js, 1)
+          old_fail = "st.textContent = 'Chain read unavailable — the prompt below still builds with the last known numbers.';"
+          assert s.count(old_fail) == 1, s.count(old_fail)
+          s = s.replace(old_fail, "st.textContent = 'Chain read unavailable — retrying in 30s.';", 1)
+          open('index.html', 'w', encoding='utf-8').write(s)
+          sc = re.search(r'<script>(.*?)</script>', s, re.DOTALL).group(1)
+          open('/tmp/check.js', 'w').write(sc)
+          print('mint polish applied')
+          PYEOF
+          node --check /tmp/check.js && echo 'JS SYNTAX OK'
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Polish mint section layout and supply loading state"
+          git push
